@@ -1,10 +1,15 @@
 #! /usr/bin/env python
 
 # imports
-import  sys, urllib2, hashlib, os, ssl
+import  sys, urllib2, hashlib, os, ssl, requests
 from urlparse import urlparse
+from bs4 import BeautifulSoup
 
 data_file = ".urlcheck.data"
+mailgun_url = "MAILGUN API_URL"
+mailgun_apikey = "MAILGUN API_KEY"
+mailgun_from = "John Doe <mailgun@MAILGUN_DOMAIN>"
+mailgun_to = ["example1@gmail.com", "example2@gmail.com"]
 
 def uri_ok(url):
     try:
@@ -23,6 +28,13 @@ if len(sys.argv) == 2:
 		ssl._create_default_https_context = ssl._create_unverified_context
 		response = urllib2.urlopen(sys.argv[1])
 		html = response.read()
+		soup = BeautifulSoup(html, "html.parser")
+		
+		# Add custom filters here
+		custom_html = soup.find("td", {"class": "class_dateFrom"})
+		if custom_html:
+			html = str(custom_html)
+		
 		checksum = hashlib.md5(html).hexdigest()
 		# check if we have a previous version of the site
 		if os.path.isfile(data_file) and os.access(data_file, os.R_OK):
@@ -50,8 +62,15 @@ if len(sys.argv) == 2:
 						for s in site_dictionary:
 							write_data(data_file, s, site_dictionary[s])
 
-						#TODO send email
-						##################
+						#Send email
+						print "sending email..."
+						print requests.post(
+        						mailgun_url,
+        						auth=("api", mailgun_apikey),
+        						data={"from": mailgun_from,
+              						"to": mailgun_to,
+      							"subject": "Site %s has changes!" % sys.argv[1],
+              						"text": "Please visit %s for recent changes." % sys.argv[1]})
 				else:
 					print "site doesn't exist!"
 					write_data(data_file, sys.argv[1], checksum)
